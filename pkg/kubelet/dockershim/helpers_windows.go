@@ -85,11 +85,9 @@ func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
 		// Presense of CONTAINER_NETWORK flag is considered as non-Sandbox cases here
 
 		// Todo: Add a kernel version check for more validation
-
 		if networkMode := os.Getenv("CONTAINER_NETWORK"); networkMode == "" {
-			// Do not return any IP, so that we would continue and get the IP of the Sandbox
-			ds.getIP(sandboxID, r)
-		} else {
+			// Sandbox case
+
 			// On Windows, every container that is created in a Sandbox, needs to invoke CNI plugin again for adding the Network,
 			// with the shared container name as NetNS info,
 			// This is passed down to the platform to replicate some necessary information to the new container
@@ -100,13 +98,30 @@ func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) string {
 
 			// Instead of relying on this call, an explicit call to addToNetwork should be
 			// done immediately after ContainerCreation, in case of Windows only. TBD Issue # to handle this
+			ipAddress := ds.getIP(sandboxID, r)
 
+			// workaround to trigger a dnscache service restart due to a platform bug
+			// Note: This would work with windows images, only if it has the dependent binaries.
+			// It wouldnt work with nanoserver, which misses powershell
+			pscmd := "powershell  taskkill /PID $((cmd /c sc queryex dnscache | findstr PID).Split(\":\").Trim()[1]) /f"
+			cmd := []string{
+				"powershell.exe",
+				"-command",
+				pscmd,
+			}
+
+			ds.streamingRuntime.execHandler.ExecInContainer(ds.streamingRuntime.client, r, cmd, nil, nil, nil, false, nil, 60)
+
+			return ipAddress
+		} else {
+			// Non-Sandbox case
 			if containerIP := getContainerIP(r); containerIP != "" {
 				return containerIP
 			}
 		}
 	}
 
+	// Do not return any IP, so that we would continue and get the IP of the Sandbox
 	return ""
 }
 
