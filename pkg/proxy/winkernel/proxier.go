@@ -33,6 +33,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -127,6 +128,7 @@ type endpointsInfo struct {
 	isLocal    bool
 	macAddress string
 	hnsID      string
+	owned      bool
 	refCount   uint16
 }
 
@@ -148,8 +150,8 @@ func (ep *endpointsInfo) Cleanup() {
 	ep.refCount--
 	// Remove the remote hns endpoint, if no service is referring it
 	// Never delete a Local Endpoint. Local Endpoints are already created by other entities.
-	// Remove only remote endpoints created by this service
-	if ep.refCount <= 0 && !ep.isLocal {
+	// Remove only remote endpoints created by this service (specified by owned)
+	if ep.refCount <= 0 && !ep.isLocal && ep.owned {
 		glog.V(4).Infof("Removing endpoints for %v, since no one is referencing it", ep)
 		deleteHnsEndpoint(ep.hnsID)
 		ep.hnsID = ""
@@ -171,12 +173,18 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *api.ServicePort, se
 		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
 		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 	}
+
+	targetPort := port.TargetPort.IntValue()
+	if targetPort == 0 && port.TargetPort.Type == intstr.String {
+		// Lookup IANA_SVC_NAME or the name exposed by the pod
+	}
+
 	info := &serviceInfo{
 		clusterIP:  net.ParseIP(service.Spec.ClusterIP),
 		port:       int(port.Port),
 		protocol:   port.Protocol,
 		nodePort:   int(port.NodePort),
-		targetPort: port.TargetPort.IntValue(),
+		targetPort: targetPort,
 		// Deep-copy in case the service instance changes
 		loadBalancerStatus:       *helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer),
 		sessionAffinityType:      service.Spec.SessionAffinity,
@@ -1013,6 +1021,7 @@ func (proxier *Proxier) syncProxyRules() {
 					glog.Errorf("Remote endpoint creation failed: %v", err)
 					continue
 				}
+				ep.owned = true
 			}
 
 			// Save the hnsId for reference
