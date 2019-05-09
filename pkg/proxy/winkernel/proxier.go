@@ -1133,7 +1133,7 @@ func (proxier *Proxier) syncProxyRules() {
 			hnsLoadBalancer, err := hns.getLoadBalancer(
 				hnsEndpoints,
 				false,
-				false,
+				proxier.isDSR,
 				sourceVip,
 				"",
 				Enum(svcInfo.protocol),
@@ -1155,7 +1155,7 @@ func (proxier *Proxier) syncProxyRules() {
 			hnsLoadBalancer, err = hns.getLoadBalancer(
 				hnsEndpoints,
 				false,
-				false,
+				proxier.isDSR,
 				sourceVip,
 				externalIp.ip,
 				Enum(svcInfo.protocol),
@@ -1175,7 +1175,7 @@ func (proxier *Proxier) syncProxyRules() {
 			hnsLoadBalancer, err := hns.getLoadBalancer(
 				hnsEndpoints,
 				false,
-				false,
+				proxier.isDSR,
 				sourceVip,
 				lbIngressIp.ip,
 				Enum(svcInfo.protocol),
