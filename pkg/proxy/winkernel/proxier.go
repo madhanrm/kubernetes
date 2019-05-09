@@ -1112,7 +1112,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 		hnsLoadBalancer, err := hns.getLoadBalancer(
 			hnsEndpoints,
-			false,
+			true, // isILB
 			proxier.isDSR,
 			sourceVip,
 			svcInfo.clusterIP.String(),
@@ -1154,7 +1154,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// Try loading existing policies, if already available
 			hnsLoadBalancer, err = hns.getLoadBalancer(
 				hnsEndpoints,
-				false,
+				true, // isILB
 				false,
 				sourceVip,
 				externalIP.ip,
@@ -1174,7 +1174,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// Try loading existing policies, if already available
 			hnsLoadBalancer, err := hns.getLoadBalancer(
 				hnsEndpoints,
-				false,
+				true, // isILB
 				false,
 				sourceVip,
 				lbIngressIP.ip,
